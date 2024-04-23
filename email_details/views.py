@@ -3,8 +3,12 @@ from rest_framework.decorators import api_view
 from .models import Email
 from .serializers import EmailSerializer
 from rest_framework.response import Response
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.db import transaction
+
+# added for html email including EmailMultiAlternatives added above.
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 
 # Create your views here.
@@ -20,7 +24,7 @@ def get_email(request):
     # return Response({"Message": "Success"})
 
 
-# Create a new email object
+# Create a new email object, does NOT include sending emails.
 @api_view(["POST"])
 def create_email(request):
     email = Email.objects.create(
@@ -34,6 +38,7 @@ def create_email(request):
     # return Response({"Message": "Success"})
 
 
+# Create and send a new TEXT email.
 @api_view(["POST"])
 @transaction.atomic
 def create_send_email(request):
@@ -54,6 +59,38 @@ def create_send_email(request):
         from_email=None,
         recipient_list=[get_email],
         fail_silently=False,
+    )
+
+    # serializer = EmailSerializer(email)
+    # return Response(serializer.data)
+    return Response({"Message": "Success"})
+
+
+# Create and send a new HTML email
+@api_view(["POST"])
+def create_send_htmlemail(request):
+
+    subject = request.data.get("subject")
+    get_email = request.data.get("email")
+
+    html_message = render_to_string("content/email.html")
+    # extracts plain text from html message without the tags.
+    plain_message = strip_tags(html_message)
+
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=plain_message,
+        from_email=None,
+        to=[get_email],
+    )
+
+    message.attach_alternative(html_message, "text/html")
+    message.send()
+
+    email = Email.objects.create(
+        subject=subject,
+        body="Email sent",
+        email=get_email,
     )
 
     # serializer = EmailSerializer(email)
