@@ -10,6 +10,9 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
+# passing variables inside the HTML email template
+from django.contrib.auth.models import User
+
 
 # Create your views here.
 
@@ -74,6 +77,55 @@ def create_send_htmlemail(request):
     get_email = request.data.get("email")
 
     html_message = render_to_string("content/email.html")
+    # extracts plain text from html message without the tags.
+    plain_message = strip_tags(html_message)
+
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=plain_message,
+        from_email=None,
+        to=[get_email],
+    )
+
+    message.attach_alternative(html_message, "text/html")
+    message.send()
+
+    email = Email.objects.create(
+        subject=subject,
+        body="Email sent",
+        email=get_email,
+    )
+
+    # serializer = EmailSerializer(email)
+    # return Response(serializer.data)
+    return Response({"Message": "Success"})
+
+
+# Create and send a new HTML email by passing variables.
+@api_view(["POST"])
+def create_send_htmlemail_variables(request):
+
+    subject = request.data.get("subject")
+    get_email = request.data.get("email")
+
+    # Adding below code to pass variables.
+    # Note: exists only works with filter.
+    if User.objects.filter(email=get_email).exists():
+        user = User.objects.get(email=get_email)
+        welcome_message = "Welcome " + str(user.first_name) + " " + str(user.last_name)
+    else:
+        welcome_message = "Welcome to our email"
+
+    link_app = "http://127.0.0.1:8000"
+
+    context = {
+        "welcome_message": welcome_message,
+        "link_app": link_app,
+    }
+
+    # pass the context containing the welcome_message and the link_app to the html_message.
+    # Also add link_app and welcome_message to the email.html file
+    html_message = render_to_string("content/email.html", context=context)
     # extracts plain text from html message without the tags.
     plain_message = strip_tags(html_message)
 
